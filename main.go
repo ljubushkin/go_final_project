@@ -2,81 +2,72 @@ package main
 
 import (
 	"database/sql"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
-	"time"
 
+	"github.com/joho/godotenv"
+	"github.com/ljubushkin/go_final_project/auth"
+	"github.com/ljubushkin/go_final_project/database"
+	"github.com/ljubushkin/go_final_project/date"
+	"github.com/ljubushkin/go_final_project/tasks"
 	_ "modernc.org/sqlite"
 )
 
-var db *sql.DB
-
-func apiNextDate(w http.ResponseWriter, r *http.Request) {
-	nowStr := r.URL.Query().Get("now")
-	dateStr := r.URL.Query().Get("date")
-	repeatStr := r.URL.Query().Get("repeat")
-
-	now, err := time.Parse("20060102", nowStr)
-	if err != nil {
-		http.Error(w, "Некорректная дата now", http.StatusBadRequest)
-		return
-	}
-
-	nextDate, err := NextDate(now, dateStr, repeatStr)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	fmt.Fprintln(w, nextDate)
-}
-
-func taskHandler(w http.ResponseWriter, r *http.Request) {
+func TaskHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
-		addTaskHandler(w, r)
+		tasks.AddTaskHandler(w, r)
 	case http.MethodGet:
-		GetTaskHandler(w, r)
+		tasks.GetTaskHandler(w, r)
 	case http.MethodPut:
-		EditTaskHandler(w, r)
+		tasks.EditTaskHandler(w, r)
 	case http.MethodDelete:
-		DeleteTaskHandler(w, r)
+		tasks.DeleteTaskHandler(w, r)
 	default:
 		http.Error(w, `{"error":"Invalid request method"}`, http.StatusMethodNotAllowed)
 	}
 }
+
 func main() {
+	err := godotenv.Load()
+	if err != nil {
+		log.Fatalf("Error loading .env file: %v", err)
+	}
+
 	dbFile := os.Getenv("TODO_DBFILE")
 	if dbFile == "" {
 		dbFile = "scheduler.db"
 	}
 
-	var err error
-	db, err = sql.Open("sqlite", dbFile)
+	tasks.DB, err = sql.Open("sqlite", dbFile)
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer db.Close()
+	defer tasks.DB.Close()
 
 	_, err = os.Stat(dbFile)
 	if err != nil {
-		createDatabase(db)
+		database.CreateDatabase(tasks.DB)
 	} else {
 		log.Println("Database already exists")
 	}
 
-	http.HandleFunc("/api/nextdate", apiNextDate)
-	http.HandleFunc("/api/task", taskHandler)
-	http.Handle("/", http.FileServer(http.Dir("./web")))
-	http.HandleFunc("/api/tasks", GetTasksHandler)
-	http.HandleFunc("/api/task/done", DoneTaskHandler)
+	http.HandleFunc("/api/signin", auth.SigninHandler)
+	http.Handle("/api/nextdate", http.HandlerFunc(date.ApiNextDate))
+	http.Handle("/api/task", auth.Auth(http.HandlerFunc(TaskHandler)))
+	http.Handle("/api/tasks", auth.Auth(http.HandlerFunc(tasks.GetTasksHandler)))
+	http.Handle("/api/task/done", auth.Auth(http.HandlerFunc(tasks.DoneTaskHandler)))
 
-	port := "7540"
-	if envPort := os.Getenv("TODO_PORT"); envPort != "" {
-		port = envPort
+	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./web"))))
+
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "7540"
 	}
+
+	log.Printf("Server is starting on port %s...\n", port)
+
 	err = http.ListenAndServe(":"+port, nil)
 	if err != nil {
 		log.Fatal(err)

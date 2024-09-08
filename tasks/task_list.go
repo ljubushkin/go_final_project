@@ -1,10 +1,14 @@
-package main
+package tasks
 
 import (
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
+	"time"
 )
+
+var DB *sql.DB
 
 func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
@@ -12,8 +16,29 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `SELECT id, date, title, comment, repeat FROM scheduler ORDER BY date LIMIT 50`
-	rows, err := db.Query(query)
+	const tasksLimit int8 = 50
+
+	search := r.URL.Query().Get("search")
+	query := `SELECT id, date, title, comment, repeat FROM scheduler`
+	args := []interface{}{}
+
+	if search != "" {
+
+		if parsedDate, err := time.Parse("02.01.2006", search); err == nil {
+			query += ` WHERE date = ?`
+			args = append(args, parsedDate.Format("20060102"))
+		} else {
+
+			query += ` WHERE title LIKE ? OR comment LIKE ?`
+			searchTerm := "%" + search + "%"
+			args = append(args, searchTerm, searchTerm)
+		}
+	}
+
+	query += ` ORDER BY date LIMIT ?`
+	args = append(args, tasksLimit)
+
+	rows, err := DB.Query(query, args...)
 	if err != nil {
 		http.Error(w, `{"error":"Failed to retrieve tasks from the database"}`, http.StatusInternalServerError)
 		return
@@ -23,8 +48,7 @@ func GetTasksHandler(w http.ResponseWriter, r *http.Request) {
 	tasks := []map[string]string{}
 	for rows.Next() {
 		var id int
-		var date string
-		var title, comment, repeat string
+		var date, title, comment, repeat string
 		if err := rows.Scan(&id, &date, &title, &comment, &repeat); err != nil {
 			http.Error(w, `{"error":"Failed to scan task from the database"}`, http.StatusInternalServerError)
 			return

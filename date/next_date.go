@@ -1,18 +1,41 @@
-package main
+package date
 
 import (
 	"fmt"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
 )
+
+const FormatDate string = "20060102"
+
+func ApiNextDate(w http.ResponseWriter, r *http.Request) {
+	nowStr := r.URL.Query().Get("now")
+	dateStr := r.URL.Query().Get("date")
+	repeatStr := r.URL.Query().Get("repeat")
+
+	now, err := time.Parse(FormatDate, nowStr)
+	if err != nil {
+		http.Error(w, "Некорректная дата now", http.StatusBadRequest)
+		return
+	}
+
+	nextDate, err := NextDate(now, dateStr, repeatStr)
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	fmt.Fprintln(w, nextDate)
+}
 
 func NextDate(now time.Time, dateStart, repeat string) (string, error) {
 	if repeat == "" {
 		return "", fmt.Errorf("repeat value is empty")
 	}
 
-	date, err := time.Parse("20060102", dateStart)
+	date, err := time.Parse(FormatDate, dateStart)
 	if err != nil {
 		return "", err
 	}
@@ -53,7 +76,7 @@ func NextDate(now time.Time, dateStart, repeat string) (string, error) {
 		return "", fmt.Errorf("invalid repeat character")
 	}
 
-	return date.Format("20060102"), nil
+	return date.Format(FormatDate), nil
 }
 
 func addDayTask(now, date time.Time, days int) time.Time {

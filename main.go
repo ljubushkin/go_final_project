@@ -61,7 +61,7 @@ func main() {
 
 	http.Handle("/", http.StripPrefix("/", http.FileServer(http.Dir("./web"))))
 
-	port := os.Getenv("PORT")
+	port := os.Getenv("TODO_PORT")
 	if port == "" {
 		port = "7540"
 	}

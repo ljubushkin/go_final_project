@@ -9,7 +9,15 @@ import (
 	"github.com/dgrijalva/jwt-go"
 )
 
-var jwtKey = []byte(os.Getenv("JWT_SECRET"))
+var (
+	jwtKey           []byte
+	expectedPassword string
+)
+
+func init() {
+	jwtKey = []byte(os.Getenv("TODO_JWT_SECRET_KEY"))
+	expectedPassword = os.Getenv("TODO_PASSWORD")
+}
 
 type Credentials struct {
 	Password string `json:"password"`
@@ -27,7 +35,12 @@ func SigninHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	expectedPassword := os.Getenv("TODO_PASSWORD")
+	if creds.Password == "" {
+		w.WriteHeader(http.StatusUnauthorized)
+		json.NewEncoder(w).Encode(map[string]string{"error": "Пароль не может быть пустым"})
+		return
+	}
+
 	if creds.Password != expectedPassword {
 		w.WriteHeader(http.StatusUnauthorized)
 		json.NewEncoder(w).Encode(map[string]string{"error": "Неверный пароль"})

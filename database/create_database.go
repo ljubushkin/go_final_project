@@ -1,4 +1,4 @@
-package main
+package database
 
 import (
 	"database/sql"
@@ -7,15 +7,15 @@ import (
 	_ "modernc.org/sqlite"
 )
 
-func createDatabase(db *sql.DB) {
+func CreateDatabase(db *sql.DB) {
 
 	createTableSQL := `
 	CREATE TABLE IF NOT EXISTS scheduler (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
-		date TEXT,
+		date TEXT CHECK (LENGTH(date) = 8),
 		title TEXT,
 		comment TEXT,
-		repeat TEXT
+		repeat TEXT CHECK (LENGTH(repeat) <= 128)
 	);
 	`
 	_, err := db.Exec(createTableSQL)

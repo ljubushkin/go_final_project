@@ -1,4 +1,4 @@
-package main
+package tasks
 
 import (
 	"fmt"
@@ -26,7 +26,7 @@ func DeleteTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `DELETE FROM scheduler WHERE id = ?`
-	result, err := db.Exec(query, id)
+	result, err := DB.Exec(query, id)
 	if err != nil {
 		http.Error(w, `{"error":"Failed to delete task from the database"}`, http.StatusInternalServerError)
 		return

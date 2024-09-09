@@ -1,21 +1,15 @@
-package main
+package tasks
 
 import (
 	"encoding/json"
 	"fmt"
 	"net/http"
 	"time"
+
+	"github.com/ljubushkin/go_final_project/date"
 )
 
-type Task struct {
-	ID      string `json:"id"`
-	Date    string `json:"date"`
-	Title   string `json:"title"`
-	Comment string `json:"comment"`
-	Repeat  string `json:"repeat"`
-}
-
-func addTaskHandler(w http.ResponseWriter, r *http.Request) {
+func AddTaskHandler(w http.ResponseWriter, r *http.Request) {
 
 	if r.Method != http.MethodPost {
 		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
@@ -36,28 +30,28 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if task.Date == "" {
-		task.Date = time.Now().Format("20060102")
+		task.Date = time.Now().Format(date.FormatDate)
 	} else {
-		_, err := time.Parse("20060102", task.Date)
+		_, err := time.Parse(date.FormatDate, task.Date)
 		if err != nil {
 			http.Error(w, `{"error":"Invalid date format, should be YYYYMMDD"}`, http.StatusBadRequest)
 			return
 		}
 	}
 
-	now := time.Now().Format("20060102")
+	now := time.Now().Format(date.FormatDate)
 	if task.Date < now && task.Repeat == "" {
 		task.Date = now
 	}
 
 	if task.Repeat != "" {
-		parsedDate, err := time.Parse("20060102", task.Date)
+		parsedDate, err := time.Parse(date.FormatDate, task.Date)
 		if err != nil {
 			http.Error(w, `{"error":"Invalid date format, should be YYYYMMDD"}`, http.StatusBadRequest)
 			return
 		}
 
-		nextDate, err := NextDate(parsedDate, task.Date, task.Repeat)
+		nextDate, err := date.NextDate(parsedDate, task.Date, task.Repeat)
 		if err != nil {
 			http.Error(w, fmt.Sprintf(`{"error":"%s"}`, err.Error()), http.StatusBadRequest)
 			return
@@ -71,7 +65,7 @@ func addTaskHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `INSERT INTO scheduler (date, title, comment, repeat) VALUES (?, ?, ?, ?)`
-	res, err := db.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
+	res, err := DB.Exec(query, task.Date, task.Title, task.Comment, task.Repeat)
 	if err != nil {
 		http.Error(w, `{"error":"Failed to add task to the database"}`, http.StatusInternalServerError)
 		return
